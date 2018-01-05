@@ -1,33 +1,36 @@
 import numpy as np
 import torch
+import torch.nn.functional as F
 from torch.autograd import Variable
 from torch.autograd.gradcheck import zero_gradients
 import copy
 from utils import clip
 
-def fgsm(model, ct, x, y, lr=0.1, eps=0.1, niter=1):
+def fgsm(model, x, y, eps=0.1):
 
 	'''
 	Adapted from https://github.com/kawine/atgan/tree/master/attacks
 	'''
-	x0 = x.clone()
+
 	x, y = Variable(x, requires_grad=True), Variable( y )
 	model.eval()
 
 	if x.grad is not None:
 		x.grad.data.zero_()
 	y_ = model(x)
-	loss = ct(y_, y)
+	loss = F.nll_loss(y_, y)
 	loss.backward()
 
 	dx = x.grad
 
-	adv = x0 + eps*torch.sign(dx)
+	attack = eps*torch.sign(dx)
+
+	adv = x + attack
 	adv = torch.clamp(adv, 0.0, 1.0)
 
-	return adv.data[0]
+	return adv.data
 
-def igsm(model, ct, x, y, lr=0.1, eps=0.1, niter=1):
+def igsm(model, x, y, lr=0.1, eps=0.1, niter=10):
 
 	'''
 	Adapted from https://github.com/leiwu0308/adversarial.example
@@ -40,14 +43,15 @@ def igsm(model, ct, x, y, lr=0.1, eps=0.1, niter=1):
 		if x.grad is not None:
 			x.grad.data.zero_()
 		y_ = model(x)
-		loss = ct(y_, y)
+		loss = F.nll_loss(y_, y)
 		loss.backward()
 
-		dx = x.grad
-		x.add_(lr, dx.sign())
-		x = clip(x.data, x0, eps)
+		dx = x.grad.data
 
-	return x.data[0]
+		x.data.add_(lr, dx.sign())
+		x.data = clip(x.data, x0, eps)
+
+	return x.data
 
 def deepfool(model, x, num_classes=None, overshoot=0.02, max_iter=50):
 

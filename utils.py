@@ -7,5 +7,5 @@ def clip(x, x0, eps):
 	'''
 	dx = x - x0
 	dx.clamp_(-eps, eps)
-	x.copy_(x0).add_(1,dx).clamp_(0,1)
+	x.copy_(x0).add_(1, dx).clamp_(0,1)
 	return x
