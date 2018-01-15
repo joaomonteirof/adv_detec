@@ -90,6 +90,17 @@ class DenseNet(nn.Module):
 		else:
 			return F.log_softmax(out, dim=1)
 
+	def forward_oltl(self, x):
+		out = self.conv1(x)
+		out = self.trans1(self.dense1(out))
+		out = self.trans2(self.dense2(out))
+		out = self.trans3(self.dense3(out))
+		out = self.dense4(out)
+		out = F.avg_pool2d(F.relu(self.bn(out)), 4)
+		out = out.view(out.size(0), -1)
+		out = self.linear(out)
+		return F.log_softmax(out, dim=1), F.softmax(out, dim=1)
+
 def DenseNet121(soft=False):
 	return DenseNet(Bottleneck, [6,12,24,16], growth_rate=32, soft=False)
 

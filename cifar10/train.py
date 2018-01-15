@@ -1,42 +1,39 @@
 from __future__ import print_function
 import argparse
-import numpy as np
 import torch
-import torch.nn.functional as F
+from torch.utils.data import DataLoader
+from train_loop import TrainLoop
 import torch.optim as optim
 from torchvision import datasets, transforms
-from torch.autograd import Variable
 from models import vgg, resnet, densenet
 
 # Training settings
-parser = argparse.ArgumentParser(description='Adv attacks/defenses on CIFAR10')
-parser.add_argument('--batch-size', type=int, default=64, metavar='N', help='input batch size for training (default: 64)')
-parser.add_argument('--test-batch-size', type=int, default=1000, metavar='N', help='input batch size for testing (default: 1000)')
-parser.add_argument('--epochs', type=int, default=100, metavar='N', help='number of epochs to train (default: 100)')
-parser.add_argument('--lr', type=float, default=0.001, metavar='LR', help='learning rate (default: 0.001)')
-parser.add_argument('--l2', type=float, default=0.00001, metavar='lambda', help='L2 wheight decay coefficient (default: 0.00001)')
-parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
-parser.add_argument('--seed', type=int, default=1, metavar='S', help='random seed (default: 1)')
-parser.add_argument('--log-interval', type=int, default=100, metavar='N', help='how many batches to wait before logging training status')
+parser = argparse.ArgumentParser(description='Cifar10 Classification')
+parser.add_argument('--batch-size', type=int, default=128, metavar='N', help='input batch size for training (default: 128)')
+parser.add_argument('--valid-batch-size', type=int, default=100, metavar='N', help='input batch size for testing (default: 100)')
+parser.add_argument('--epochs', type=int, default=500, metavar='N', help='number of epochs to train (default: 500)')
+parser.add_argument('--lr', type=float, default=0.1, metavar='LR', help='learning rate (default: 0.1)')
+parser.add_argument('--l2', type=float, default=5e-4, metavar='lambda', help='L2 wheight decay coefficient (default: 0.0005)')
+parser.add_argument('--momentum', type=float, default=0.9, metavar='lambda', help='Momentum (default: 0.9)')
+parser.add_argument('--ngpus', type=int, default=0, help='Number of GPUs to use. Default=0 (no GPU)')
+parser.add_argument('--checkpoint-epoch', type=int, default=None, metavar='N', help='epoch to load for checkpointing. If None, training starts from scratch')
+parser.add_argument('--checkpoint-path', type=str, default=None, metavar='Path', help='Path for checkpointing')
+parser.add_argument('--data-path', type=str, default='./data/', metavar='Path', help='Path to data .hdf')
+parser.add_argument('--seed', type=int, default=42, metavar='S', help='random seed (default: 42)')
+parser.add_argument('--n-workers', type=int, default=4, metavar='N', help='Workers for data loading. Default is 4')
 parser.add_argument('--model', choices=['vgg', 'resnet', 'densenet'], default='vgg')
 parser.add_argument('--soft', action='store_true', default=False, help='Adds extra softmax layer')
 args = parser.parse_args()
-args.cuda = not args.no_cuda and torch.cuda.is_available()
+args.cuda = True if args.ngpus>0 and torch.cuda.is_available() else False
 
-# https://github.com/kuangliu/pytorch-cifar
-
-torch.manual_seed(args.seed)
-if args.cuda:
-    torch.cuda.manual_seed(args.seed)
-
-transform_train = transforms.Compose([transforms.RandomCrop(32, padding=4), transforms.RandomHorizontalFlip(), transforms.ToTensor(), transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),])
-transform_test = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),])
+transform_train = transforms.Compose([transforms.RandomCrop(32, padding=4), transforms.RandomHorizontalFlip(), transforms.ToTensor(),])
+transform_test = transforms.ToTensor()
 
 trainset = datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
-train_loader = torch.utils.data.DataLoader(trainset, batch_size=128, shuffle=True, num_workers=2)
+train_loader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=2)
 
 testset = datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)
-test_loader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=2)
+test_loader = torch.utils.data.DataLoader(testset, batch_size=args.valid_batch_size, shuffle=False, num_workers=2)
 
 if args.model == 'vgg':
 	model = vgg.VGG('VGG16', soft=args.soft)
@@ -45,57 +42,16 @@ elif args.model == 'resnet':
 elif args.model == 'densenet':
 	model = resnet.densenet_cifar(soft=args.soft)
 
-model_id = 'cifar10_'+args.model+('_soft' if args.soft else '')
+if args.ngpus > 1:
+	model = torch.nn.DataParallel(model, device_ids=list(range(args.ngpus)))
 
 if args.cuda:
-	model.cuda()
+	model = model.cuda()
 
-optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.l2)
+optimizer = optim.SGD(model.parameters(), lr=args.lr, weight_decay=args.l2, momentum=args.momentum)
 
-best_test_acc = -np.inf
+trainer = TrainLoop(model, optimizer, train_loader, test_loader, checkpoint_path=args.checkpoint_path, checkpoint_epoch=args.checkpoint_epoch, cuda=args.cuda)
 
-def save_model():
-	print('Saving model...')
-	ckpt = {'model_state': model.state_dict()}
-	torch.save(ckpt, model_id+'.pt')
+print('Cuda Mode is: {}'.format(args.cuda))
 
-def train(epoch):
-	model.train()
-	for batch_idx, (data, target) in enumerate(train_loader):
-		if args.cuda:
-			data, target = data.cuda(), target.cuda()
-		data_v, target_v = Variable(data), Variable(target)
-		optimizer.zero_grad()
-		output = model(data_v)
-		loss = F.nll_loss(output, target_v)
-		loss.backward()
-		optimizer.step()
-		if batch_idx % args.log_interval == 0:
-			print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(epoch, batch_idx * len(data), len(train_loader.dataset), 100. * batch_idx / len(train_loader), loss.data[0]))
-
-def test(epoch):
-	model.eval()
-	test_loss = 0
-	correct = 0
-	for data, target in test_loader:
-		data = (data-data.max(0)[0])/(data.max(0)[0]-data.min(0)[0])
-		if args.cuda:
-			data, target = data.cuda(), target.cuda()
-		data, target = Variable(data, volatile=True), Variable(target)
-		output = model(data)
-		test_loss += F.nll_loss(output, target).data[0]
-		pred = output.data.max(1)[1] # get the index of the max log-probability
-		correct += pred.eq(target.data).cpu().sum()
-
-	test_loss = test_loss
-	test_loss /= len(test_loader) # loss function already averages over batch size
-
-	if correct>best_test_acc:
-		best_test_acc = correct
-		save_model()
-
-	print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(test_loss, correct, len(test_loader.dataset), 100. * correct / len(test_loader.dataset)))
-
-for epoch in range(1, args.epochs + 1):
-	train(epoch)
-	test(epoch)
+trainer.train(n_epochs=args.epochs)

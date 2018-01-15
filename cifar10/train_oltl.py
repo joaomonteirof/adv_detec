@@ -1,110 +1,51 @@
 from __future__ import print_function
 import argparse
-import numpy
 import torch
-import torch.nn.functional as F
+from torch.utils.data import DataLoader
+from train_loop_oltl import TrainLoop
 import torch.optim as optim
 from torchvision import datasets, transforms
-from torch.autograd import Variable
-import models
+from models import vgg, resnet, densenet
 
 # Training settings
-parser = argparse.ArgumentParser(description='Adv attacks/defenses on MNIST')
-parser.add_argument('--batch-size', type=int, default=64, metavar='N', help='input batch size for training (default: 64)')
-parser.add_argument('--test-batch-size', type=int, default=1000, metavar='N', help='input batch size for testing (default: 1000)')
-parser.add_argument('--epochs', type=int, default=10, metavar='N', help='number of epochs to train (default: 10)')
-parser.add_argument('--lr', type=float, default=0.01, metavar='LR', help='learning rate (default: 0.01)')
-parser.add_argument('--momentum', type=float, default=0.5, metavar='M', help='SGD momentum (default: 0.5)')
-parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
-parser.add_argument('--seed', type=int, default=1, metavar='S', help='random seed (default: 1)')
-parser.add_argument('--log-interval', type=int, default=100, metavar='N', help='how many batches to wait before logging training status')
+parser = argparse.ArgumentParser(description='Cifar10 Classification')
+parser.add_argument('--batch-size', type=int, default=128, metavar='N', help='input batch size for training (default: 128)')
+parser.add_argument('--valid-batch-size', type=int, default=100, metavar='N', help='input batch size for testing (default: 100)')
+parser.add_argument('--epochs', type=int, default=500, metavar='N', help='number of epochs to train (default: 500)')
+parser.add_argument('--patience', type=int, default=10, metavar='N', help='How many epochs without improvement to wait before reducing the LR (default: 10)')
+parser.add_argument('--lr', type=float, default=0.1, metavar='LR', help='learning rate (default: 0.1)')
+parser.add_argument('--l2', type=float, default=5e-4, metavar='lambda', help='L2 wheight decay coefficient (default: 0.0005)')
+parser.add_argument('--momentum', type=float, default=0.9, metavar='lambda', help='Momentum (default: 0.9)')
+parser.add_argument('--ngpus', type=int, default=0, help='Number of GPUs to use. Default=0 (no GPU)')
+parser.add_argument('--checkpoint-epoch', type=int, default=None, metavar='N', help='epoch to load for checkpointing. If None, training starts from scratch')
+parser.add_argument('--checkpoint-path', type=str, default=None, metavar='Path', help='Path for checkpointing')
+parser.add_argument('--data-path', type=str, default='./data/', metavar='Path', help='Path to data .hdf')
+parser.add_argument('--seed', type=int, default=42, metavar='S', help='random seed (default: 42)')
+parser.add_argument('--n-workers', type=int, default=4, metavar='N', help='Workers for data loading. Default is 4')
 args = parser.parse_args()
-args.cuda = not args.no_cuda and torch.cuda.is_available()
+args.cuda = True if args.ngpus>0 and torch.cuda.is_available() else False
 
-torch.manual_seed(args.seed)
+transform_train = transforms.Compose([transforms.RandomCrop(32, padding=4), transforms.RandomHorizontalFlip(), transforms.ToTensor(),])
+transform_test = transforms.ToTensor()
+
+trainset = datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
+train_loader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=2)
+
+testset = datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)
+test_loader = torch.utils.data.DataLoader(testset, batch_size=args.valid_batch_size, shuffle=False, num_workers=2)
+
+model_1 = vgg.VGG('VGG16', soft=False)
+model_2 = resnet.ResNet18(soft=False)
+
 if args.cuda:
-    torch.cuda.manual_seed(args.seed)
+	model_1 = model_1.cuda()
+	model_2 = model_2.cuda()
 
-kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
-train_loader = torch.utils.data.DataLoader(datasets.MNIST('../data', train=True, download=True, transform=transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))   ])), batch_size=args.batch_size, shuffle=True, **kwargs)
-test_loader = torch.utils.data.DataLoader(datasets.MNIST('../data', train=False, transform=transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])), batch_size=args.batch_size, shuffle=True, **kwargs)
+optimizer_1 = optim.SGD(model_1.parameters(), lr=args.lr, weight_decay=args.l2, momentum=args.momentum)
+optimizer_2 = optim.SGD(model_2.parameters(), lr=args.lr, weight_decay=args.l2, momentum=args.momentum)
 
-model_1 = models.cnn()
-model_2 = models.mlp()
+trainer = TrainLoop(model_1, model_2, optimizer_1, optimizer_2, train_loader, test_loader, checkpoint_path=args.checkpoint_path, checkpoint_epoch=args.checkpoint_epoch, cuda=args.cuda)
 
-if args.cuda:
-	model_1.cuda()
-	model_2.cuda()
+print('Cuda Mode is: {}'.format(args.cuda))
 
-optimizer_1 = optim.SGD(model_1.parameters(), lr=args.lr, momentum=args.momentum)
-optimizer_2 = optim.SGD(model_2.parameters(), lr=args.lr, momentum=args.momentum)
-
-def train(epoch):
-	model_1.train()
-	model_2.train()
-	for batch_idx, (data, target) in enumerate(train_loader):
-		if args.cuda:
-			data, target = data.cuda(), target.cuda()
-		data_v, target_v = Variable(data), Variable(target)
-		optimizer_1.zero_grad()
-		optimizer_2.zero_grad()
-
-		output1_log, output1 = model_1.forward_oltl(data_v)
-		output2_log, output2 = model_2.forward_oltl(data_v)
-
-		target_1 = Variable(output1.data, requires_grad=False)
-		target_2 = Variable(output2.data, requires_grad=False)
-
-		loss1 = F.nll_loss(output1_log, target_v) + F.kl_div(output1_log, target_2)
-		loss2 = F.nll_loss(output2_log, target_v) + F.kl_div(output2_log, target_1)
-
-		loss1.backward()
-		loss2.backward()
-		optimizer_1.step()
-		optimizer_2.step()
-		if batch_idx % args.log_interval == 0:
-			print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLosses: {:.6f}, {:.6f}'.format(epoch, batch_idx * len(data), len(train_loader.dataset), 100. * batch_idx / len(train_loader), loss1.data[0], loss2.data[0]))
-
-def test(epoch):
-	model_1.eval()
-	test_loss = 0
-	correct = 0
-	for data, target in test_loader:
-		if args.cuda:
-			data, target = data.cuda(), target.cuda()
-		data, target = Variable(data, volatile=True), Variable(target)
-		output, _ = model_1.forward_oltl(data)
-		test_loss += F.nll_loss(output, target).data[0]
-		pred = output.data.max(1)[1] # get the index of the max log-probability
-		correct += pred.eq(target.data).cpu().sum()
-
-	test_loss = test_loss
-	test_loss /= len(test_loader) # loss function already averages over batch size
-	print('\nModel 1  --  Test set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(test_loss, correct, len(test_loader.dataset), 100. * correct / len(test_loader.dataset)))
-
-	model_2.eval()
-	test_loss = 0
-	correct = 0
-	for data, target in test_loader:
-		if args.cuda:
-			data, target = data.cuda(), target.cuda()
-		data, target = Variable(data, volatile=True), Variable(target)
-		output, _ = model_2.forward_oltl(data)
-		test_loss += F.nll_loss(output, target).data[0]
-		pred = output.data.max(1)[1] # get the index of the max log-probability
-		correct += pred.eq(target.data).cpu().sum()
-
-	test_loss = test_loss
-	test_loss /= len(test_loader) # loss function already averages over batch size
-	print('\nModel 2  --  Test set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(test_loss, correct, len(test_loader.dataset), 100. * correct / len(test_loader.dataset)))
-
-def save_model():
-	print('Saving model...')
-	ckpt = {'model1_state': model_1.state_dict(), 'model2_state': model_2.state_dict()}
-	torch.save(ckpt, 'mnist_oltl.pt')
-
-for epoch in range(1, args.epochs + 1):
-	train(epoch)
-	test(epoch)
-
-save_model()
+trainer.train(n_epochs=args.epochs, patience=args.patience)

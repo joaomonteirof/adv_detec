@@ -29,6 +29,12 @@ class VGG(nn.Module):
 		else:
 			return F.log_softmax(out, dim=1)
 
+	def forward_oltl(self, x):
+		out = self.features(x)
+		out = out.view(out.size(0), -1)
+		out = self.classifier(out)
+		return F.log_softmax(out, dim=1), F.softmax(out, dim=1)
+
 	def _make_layers(self, cfg):
 		layers = []
 		in_channels = 3
