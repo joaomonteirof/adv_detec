@@ -10,7 +10,7 @@ from models import vgg, resnet, densenet
 import pickle
 import foolbox
 from foolbox.models import PyTorchModel
-from foolbox.attacks import FGSM, IterativeGradientSignAttack, DeepFoolAttack, SaliencyMapAttack, GaussianBlurAttack, SaltAndPepperNoiseAttack, AdditiveGaussianNoiseAttack
+from foolbox.attacks import FGSM, IterativeGradientSignAttack, DeepFoolAttack, SaliencyMapAttack
 import sys
 
 # Training settings
@@ -32,15 +32,12 @@ trainset = datasets.CIFAR10(root='./data', train=True, download=True, transform=
 model_1 = vgg.VGG('VGG16', soft=args.soft)
 model_2 = resnet.ResNet18(soft=args.soft)
 
-model_id_1 = args.model_path + 'cifar_vgg' + ('_soft' if args.soft else '') + '.pt'
-model_id_2 = args.model_path + 'cifar_resnet' + ('_soft' if args.soft else '') + '.pt'
+model_id = args.model_path + 'cifar_oltl' + ('_soft' if args.soft else '') + '.pt'
 
-mod_state_1 = torch.load(model_id_1, map_location = lambda storage, loc: storage)
-model_1.load_state_dict(mod_state_1['model_state'])
+mod_state = torch.load(model_id, map_location = lambda storage, loc: storage)
+model_1.load_state_dict(mod_state['model_1_state'])
+model_2.load_state_dict(mod_state['model_2_state'])
 model_1.eval()
-
-mod_state_2 = torch.load(model_id_2, map_location = lambda storage, loc: storage)
-model_2.load_state_dict(mod_state_2['model_state'])
 model_2.eval()
 
 if args.cuda:
@@ -48,16 +45,15 @@ if args.cuda:
 	model_2.cuda()
 
 fool_model_1 = PyTorchModel(model_1, bounds=(0,1), num_classes=10, cuda=False)
-attack_1 = AdditiveGaussianNoiseAttack(fool_model_1)
+attack_1 = IterativeGradientSignAttack(fool_model_1)
 fool_model_2 = PyTorchModel(model_2, bounds=(0,1), num_classes=10, cuda=False)
-attack_2 = AdditiveGaussianNoiseAttack(fool_model_2)
+attack_2 = IterativeGradientSignAttack(fool_model_2)
 #attack = FGSM(fool_model)
 #attack = IterativeGradientSignAttack(fool_model)
 #attack = DeepFoolAttack(fool_model)
 #attack = SaliencyMapAttack(fool_model)
 
-print(model_id_1[:-3])
-print(model_id_2[:-3])
+print(model_id[:-3])
 
 data = []
 
@@ -97,6 +93,6 @@ for i in range(args.data_size):
 
 data = np.asarray(data)
 
-pfile = open('./detec_gaussiannoise.p', 'wb')
+pfile = open('./detec_igsm_oltl.p', 'wb')
 pickle.dump(data.squeeze(), pfile)
 pfile.close()

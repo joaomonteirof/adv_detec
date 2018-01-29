@@ -179,8 +179,8 @@ class TrainLoop(object):
 
 	def initialize_params(self):
 		for layer in self.model.modules():
-			if isinstance(layer, torch.nn.Conv1d):
+			if isinstance(layer, torch.nn.Conv2d):
 				init.kaiming_normal(layer.weight.data)
-			elif isinstance(layer, torch.nn.BatchNorm1d):
+			elif isinstance(layer, torch.nn.BatchNorm2d):
 				layer.weight.data.fill_(1)
 				layer.bias.data.zero_()

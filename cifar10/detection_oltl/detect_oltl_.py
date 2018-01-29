@@ -33,12 +33,12 @@ def calculate_metrics(model, x, y_true):
 ###############################################################################
 # Import data set
 
-pfile = open('detec_raw.p', 'rb')
+pfile = open('detec_oltl.p', 'rb')
 data = pickle.load(pfile)
 pfile.close()
 
-X=data[:, :-4]
-y=data[:, -4]
+X=data[:, :-1]
+y=data[:, -1]
 
 print(y.sum())
 
@@ -148,5 +148,5 @@ autolabel(rects3)
 autolabel(rects4)
 autolabel(rects5)
 
-plt.savefig('detectors_rawdata.png')
+plt.savefig('detectors_oltl.png')
 plt.show()

@@ -85,13 +85,13 @@ class TrainLoop(object):
 				self.checkpointing()
 
 			if self.history['valid_acc_1'][-1] > self.last_best_val_loss_1:
-				self.last_best_val_loss_1 = self.last_best_val_loss_1
+				self.last_best_val_loss_1 = self.history['valid_acc_1'][-1]
 				self.its_without_improv_1 = 0
 			else:
 				self.its_without_improv_1 += 1
 
 			if self.history['valid_acc_2'][-1] > self.last_best_val_loss_2:
-				self.last_best_val_loss_2 = self.last_best_val_loss_2
+				self.last_best_val_loss_2 = self.history['valid_acc_2'][-1]
 				self.its_without_improv_2 = 0
 			else:
 				self.its_without_improv_2 += 1
@@ -253,15 +253,15 @@ class TrainLoop(object):
 
 	def initialize_params(self):
 		for layer in self.model_1.modules():
-			if isinstance(layer, torch.nn.Conv1d):
+			if isinstance(layer, torch.nn.Conv2d):
 				init.kaiming_normal(layer.weight.data)
-			elif isinstance(layer, torch.nn.BatchNorm1d):
+			elif isinstance(layer, torch.nn.BatchNorm2d):
 				layer.weight.data.fill_(1)
 				layer.bias.data.zero_()
 
 		for layer in self.model_2.modules():
-			if isinstance(layer, torch.nn.Conv1d):
+			if isinstance(layer, torch.nn.Conv2d):
 				init.kaiming_normal(layer.weight.data)
-			elif isinstance(layer, torch.nn.BatchNorm1d):
+			elif isinstance(layer, torch.nn.BatchNorm2d):
 				layer.weight.data.fill_(1)
 				layer.bias.data.zero_()

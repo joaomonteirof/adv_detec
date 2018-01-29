@@ -19,6 +19,8 @@ parser.add_argument('--seed', type=int, default=1, metavar='S', help='random see
 parser.add_argument('--model', choices=['vgg', 'resnet', 'densenet'], default='vgg')
 parser.add_argument('--model-path', type=str, default='./trained_models/', metavar='Path', help='Path for model load')
 parser.add_argument('--soft', action='store_true', default=False, help='Adds extra softmax layer')
+parser.add_argument('--oltl', action='store_true', default=False, help='Test model trained with oltl')
+parser.add_argument('--no-plots', action='store_true', default=False, help='Disables plots')
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 
@@ -40,20 +42,35 @@ elif args.model == 'resnet':
 elif args.model == 'densenet':
 	model = resnet.densenet_cifar(soft=args.soft)
 
-model_id = args.model_path + 'cifar_' + args.model + ('_soft' if args.soft else '') + '.pt'
+if args.oltl:
+	model_id = args.model_path + 'cifar_oltl' + ('_soft' if args.soft else '') + '.pt'
+else:
+	model_id = args.model_path + 'cifar_' + args.model + ('_soft' if args.soft else '') + '.pt'
 
 mod_state = torch.load(model_id, map_location = lambda storage, loc: storage)
-model.load_state_dict(mod_state['model_state'])
+
+if args.oltl:
+	if args.model == 'vgg':
+		model.load_state_dict(mod_state['model_1_state'])
+	elif args.model == 'resnet':
+		model.load_state_dict(mod_state['model_2_state'])
+	else:
+		print('Only VGG and ResNet are available with OLTL...')
+		exit(1)
+else:
+	model.load_state_dict(mod_state['model_state'])
 
 if args.cuda:
 	model.cuda()
 
 def test():
+	print(args.model)
+	print(args.oltl)
 	model.eval()
 	test_loss = 0
 	correct = 0
-	for t, data, target in enumerate(test_loader):
-		#data = (data-data.max(0)[0])/(data.max(0)[0]-data.min(0)[0])
+	for t, batch in enumerate(test_loader):
+		data, target = batch
 		if args.cuda:
 			data, target = data.cuda(), target.cuda()
 		data, target = Variable(data, volatile=True), Variable(target)
@@ -65,7 +82,7 @@ def test():
 	test_loss = test_loss
 	test_loss /= len(test_loader) # loss function already averages over batch size
 
-	print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(test_loss, correct, len(test_loader.dataset), 100. * correct / len(test_loader.dataset)))
+	print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)\n'.format(test_loss, correct, len(test_loader.dataset), 100. * correct / len(test_loader.dataset)))
 
 def plot_learningcurves(history, *keys):
 
@@ -75,10 +92,10 @@ def plot_learningcurves(history, *keys):
 	plt.show()
 
 
-history = mod_state['history']
-
-plot_learningcurves(history, 'train_loss')
-plot_learningcurves(history, 'valid_loss')
-plot_learningcurves(history, 'valid_acc')
+if not args.no_plots:
+	history = mod_state['history']
+	plot_learningcurves(history, 'train_loss')
+	plot_learningcurves(history, 'valid_loss')
+	plot_learningcurves(history, 'valid_acc')
 
 test()

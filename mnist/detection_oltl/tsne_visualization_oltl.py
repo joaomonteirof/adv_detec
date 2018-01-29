@@ -11,12 +11,12 @@ rcParams['figure.figsize'] = 15, 10
 
 ###############################################################################
 # Import data set
-pfile = open('detec.p', 'rb')
+pfile = open('detec_mnist_fgsm_oltl.p', 'rb')
 data = pickle.load(pfile)
 pfile.close()
 
-X=data[:, :-4]
-y=data[:, -4]
+X=data[:, :-1]
+y=data[:, -1]
 
 #Scaling Data Set into [0,1]
 
@@ -51,5 +51,5 @@ except IndexError:
 	pass
 
 plt.legend()
-plt.savefig('tsne_rawdata.png')
+plt.savefig('tsne_oltl.png')
 plt.clf()

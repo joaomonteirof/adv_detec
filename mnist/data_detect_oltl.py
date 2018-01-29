@@ -6,7 +6,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.autograd import Variable
-from models import vgg, resnet, densenet
+from models import cnn, mlp
 import pickle
 import foolbox
 from foolbox.models import PyTorchModel
@@ -14,7 +14,7 @@ from foolbox.attacks import FGSM, IterativeGradientSignAttack, DeepFoolAttack, S
 import sys
 
 # Training settings
-parser = argparse.ArgumentParser(description='Adversarial/clean Cifar10 samples')
+parser = argparse.ArgumentParser(description='Adversarial/clean mnist samples')
 parser.add_argument('--data-size', type=int, default=10000, metavar='N', help='Number of samples in the final dataset (default: 1e4)')
 parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
 parser.add_argument('--seed', type=int, default=1, metavar='S', help='random seed (default: 1)')
@@ -27,20 +27,18 @@ torch.manual_seed(args.seed)
 if args.cuda:
     torch.cuda.manual_seed(args.seed)
 
-trainset = datasets.CIFAR10(root='./data', train=True, download=True, transform=transforms.ToTensor())
+trainset = datasets.MNIST('./data', train=True, download=True, transform=transforms.ToTensor())
 
-model_1 = vgg.VGG('VGG16', soft=args.soft)
-model_2 = resnet.ResNet18(soft=args.soft)
+model_1 = cnn()
+model_2 = mlp()
 
-model_id_1 = args.model_path + 'cifar_vgg' + ('_soft' if args.soft else '') + '.pt'
-model_id_2 = args.model_path + 'cifar_resnet' + ('_soft' if args.soft else '') + '.pt'
+model_id = args.model_path + 'mnist_oltl' + ('_soft' if args.soft else '') + '.pt'
 
-mod_state_1 = torch.load(model_id_1, map_location = lambda storage, loc: storage)
-model_1.load_state_dict(mod_state_1['model_state'])
+mod_state = torch.load(model_id, map_location = lambda storage, loc: storage)
+model_1.load_state_dict(mod_state['model1_state'])
 model_1.eval()
 
-mod_state_2 = torch.load(model_id_2, map_location = lambda storage, loc: storage)
-model_2.load_state_dict(mod_state_2['model_state'])
+model_2.load_state_dict(mod_state['model2_state'])
 model_2.eval()
 
 if args.cuda:
@@ -48,16 +46,15 @@ if args.cuda:
 	model_2.cuda()
 
 fool_model_1 = PyTorchModel(model_1, bounds=(0,1), num_classes=10, cuda=False)
-attack_1 = AdditiveGaussianNoiseAttack(fool_model_1)
+attack_1 = DeepFoolAttack(fool_model_1)
 fool_model_2 = PyTorchModel(model_2, bounds=(0,1), num_classes=10, cuda=False)
-attack_2 = AdditiveGaussianNoiseAttack(fool_model_2)
+attack_2 = DeepFoolAttack(fool_model_2)
 #attack = FGSM(fool_model)
 #attack = IterativeGradientSignAttack(fool_model)
 #attack = DeepFoolAttack(fool_model)
 #attack = SaliencyMapAttack(fool_model)
 
-print(model_id_1[:-3])
-print(model_id_2[:-3])
+print(model_id[:-3])
 
 data = []
 
@@ -97,6 +94,6 @@ for i in range(args.data_size):
 
 data = np.asarray(data)
 
-pfile = open('./detec_gaussiannoise.p', 'wb')
+pfile = open('./detec_mnist_deepfool_oltl.p', 'wb')
 pickle.dump(data.squeeze(), pfile)
 pfile.close()
