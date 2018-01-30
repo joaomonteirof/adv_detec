@@ -59,4 +59,4 @@ for i in range(args.n_samples):
 		attacker = attack_dict[attack]
 
 		attack_sample = attacker(image=clean_sample.numpy(), label=target[0,0])
-		to_pil(attack_sample).save('./samples/cifar10_{}_'.format(i+1)+attack+'.bmp')
+		to_pil(torch.from_numpy(attack_sample)).save('./samples/cifar10_{}_'.format(i+1)+attack+'.bmp')

@@ -1,5 +1,5 @@
 import numpy as np
-from sklearn import preprocessing, tree, metrics
+from sklearn import preprocessing, tree, metrics, linear_model
 from sklearn.model_selection import train_test_split, cross_val_score, cross_val_predict
 from sklearn.neural_network import MLPClassifier
 from sklearn.ensemble import RandomForestClassifier
@@ -11,45 +11,56 @@ import pickle
 from pylab import rcParams
 rcParams['figure.figsize'] = 15, 10
 
-def calculate_metrics(model, x, y_true):
+def calculate_metrics(model, x_train, y_train, x_test, y_test):
 
 	tp_class = 0
 
-	y_pred = cross_val_predict(model, x, y_true, cv=10)
+	model.fit(x_train, y_train)
 
-	acc = metrics.accuracy_score(y_true, y_pred)
+	y_pred = model.predict(x_test)
+
+	acc = metrics.accuracy_score(y_test, y_pred)
 	
-	fpr, tpr, thresholds = metrics.roc_curve(y_true, y_pred)
+	fpr, tpr, thresholds = metrics.roc_curve(y_test, y_pred)
 	auc = metrics.auc(fpr, tpr)
 
-	precision = metrics.precision_score(y_true, y_pred, pos_label = tp_class, average = 'binary')
+	precision = metrics.precision_score(y_test, y_pred, pos_label = tp_class, average = 'binary')
 
-	recall = metrics.recall_score(y_true, y_pred, pos_label = tp_class, average = 'binary')
+	recall = metrics.recall_score(y_test, y_pred, pos_label = tp_class, average = 'binary')
 
-	f1 = metrics.f1_score(y_true, y_pred, pos_label = tp_class, average = 'binary')
+	f1 = metrics.f1_score(y_test, y_pred, pos_label = tp_class, average = 'binary')
 
 	return [acc, precision, recall, f1, auc]
 
 ###############################################################################
 # Import data set
 
-pfile = open('detec_gaussiannoise.p', 'rb')
+pfile = open('detec_mnist_deepfool.p', 'rb')
 data = pickle.load(pfile)
 pfile.close()
 
 X=data[:, :-1]
 y=data[:, -1]
 
-print(X.shape)
-print(y.shape)
-
-print(y.sum())
-
 #Scaling Data Set into [0,1]
 
 min_max_scaler = preprocessing.MinMaxScaler()
 X = min_max_scaler.fit_transform(X)
 
+X_train, Y_train = X, y
+
+pfile = open('detec_mnist_saltandpepper.p', 'rb')
+data = pickle.load(pfile)
+pfile.close()
+
+X=data[:, :-1]
+y=data[:, -1]
+
+#Scaling Data Set into [0,1]
+
+X = min_max_scaler.fit_transform(X)
+
+X_test, Y_test = X, y
 
 ###############################################################################
 # Instantiate models
@@ -61,9 +72,9 @@ svc_rbf3 = SVC(kernel='rbf', C=100.0, gamma=0.1)
 ###############################################################################
 # Printing/Plotting Results
 
-scores_rf = calculate_metrics(forest, X, y)
-scores_neigh = calculate_metrics(neigh, X, y)
-scores_rbf3 = calculate_metrics(svc_rbf3, X, y)
+scores_rf = calculate_metrics(forest, X_train, Y_train, X_test, Y_test)
+scores_neigh = calculate_metrics(neigh, X_train, Y_train, X_test, Y_test)
+scores_rbf3 = calculate_metrics(svc_rbf3, X_train, Y_train, X_test, Y_test)
 
 print('Random Forest scores - Valid:')
 print(scores_rf)
@@ -113,5 +124,5 @@ autolabel(rects3)
 autolabel(rects4)
 autolabel(rects5)
 
-plt.savefig('detectors_gaussiannoise.png')
+plt.savefig('./detectors_saltandpepper.png')
 plt.show()

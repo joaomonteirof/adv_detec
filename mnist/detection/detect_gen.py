@@ -1,5 +1,5 @@
 import numpy as np
-from sklearn import preprocessing, tree, metrics
+from sklearn import preprocessing, tree, metrics, linear_model
 from sklearn.model_selection import train_test_split, cross_val_score, cross_val_predict
 from sklearn.neural_network import MLPClassifier
 from sklearn.ensemble import RandomForestClassifier
@@ -17,6 +17,8 @@ def calculate_metrics(model, x, y_true):
 
 	y_pred = cross_val_predict(model, x, y_true, cv=10)
 
+	y_pred = model.predict(x)
+
 	acc = metrics.accuracy_score(y_true, y_pred)
 	
 	fpr, tpr, thresholds = metrics.roc_curve(y_true, y_pred)
@@ -33,7 +35,7 @@ def calculate_metrics(model, x, y_true):
 ###############################################################################
 # Import data set
 
-pfile = open('detec_gaussiannoise.p', 'rb')
+pfile = open('detec_mnist_saltandpepper.p', 'rb')
 data = pickle.load(pfile)
 pfile.close()
 
@@ -113,5 +115,5 @@ autolabel(rects3)
 autolabel(rects4)
 autolabel(rects5)
 
-plt.savefig('detectors_gaussiannoise.png')
+plt.savefig('./detectors_saltandpepper.png')
 plt.show()

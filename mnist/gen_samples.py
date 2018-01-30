@@ -16,7 +16,7 @@ import sys
 # Training settings
 parser = argparse.ArgumentParser(description='Adversarial/clean mnist samples')
 parser.add_argument('--n-samples', type=int, default=2, metavar='N', help='Number of samples per attack (default: 2)')
-parser.add_argument('--seed', type=int, default=10, metavar='S', help='random seed (default: 10)')
+parser.add_argument('--seed', type=int, default=15, metavar='S', help='random seed (default: 15)')
 parser.add_argument('--model-path', type=str, default='./trained_models/', metavar='Path', help='Path for model load')
 parser.add_argument('--soft', action='store_true', default=False, help='Adds extra softmax layer')
 args = parser.parse_args()
@@ -59,4 +59,9 @@ for i in range(args.n_samples):
 		attacker = attack_dict[attack]
 
 		attack_sample = attacker(image=clean_sample.numpy(), label=target[0,0])
-		to_pil(attack_sample).save('./samples/mnist_{}_'.format(i+1)+attack+'.bmp')
+
+		try:
+			to_pil(torch.from_numpy(attack_sample)).save('./samples/mnist_{}_'.format(i+1)+attack+'.bmp')
+		except RuntimeError:
+			i-=1
+			break
