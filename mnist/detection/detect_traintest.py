@@ -17,11 +17,11 @@ def calculate_metrics(model, x_train, y_train, x_test, y_test):
 
 	model.fit(x_train, y_train)
 
-	y_pred = model.predict(x_test)
+	y_pred, y_score = model.predict(x_test), model.predict_proba(x_test)[:,1]
 
 	acc = metrics.accuracy_score(y_test, y_pred)
 	
-	fpr, tpr, thresholds = metrics.roc_curve(y_test, y_pred)
+	fpr, tpr, thresholds = metrics.roc_curve(y_test, y_score)
 	auc = metrics.auc(fpr, tpr)
 
 	precision = metrics.precision_score(y_test, y_pred, pos_label = tp_class, average = 'binary')

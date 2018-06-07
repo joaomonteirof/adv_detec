@@ -7,14 +7,12 @@ import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.autograd import Variable
 from models import vgg, resnet, densenet
-import scipy.io as sio
-import foolbox
-from foolbox.models import PyTorchModel
-from foolbox.attacks import FGSM, IterativeGradientSignAttack, DeepFoolAttack, SaliencyMapAttack, GaussianBlurAttack, SaltAndPepperNoiseAttack, AdditiveGaussianNoiseAttack
+import pickle
 import sys
+from cw import AttackCarliniWagnerL2
 
 # Training settings
-parser = argparse.ArgumentParser(description='Adversarial/clean mnist samples')
+parser = argparse.ArgumentParser(description='Adversarial/clean Cifar10 samples')
 parser.add_argument('--data-size', type=int, default=10000, metavar='N', help='Number of samples in the final dataset (default: 1e4)')
 parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
 parser.add_argument('--seed', type=int, default=1, metavar='S', help='random seed (default: 1)')
@@ -47,20 +45,13 @@ if args.cuda:
 	model_1.cuda()
 	model_2.cuda()
 
-fool_model_1 = PyTorchModel(model_1, bounds=(0,1), num_classes=10, cuda=False)
-attack_1 = IterativeGradientSignAttack(fool_model_1)
-fool_model_2 = PyTorchModel(model_2, bounds=(0,1), num_classes=10, cuda=False)
-attack_2 = IterativeGradientSignAttack(fool_model_2)
-#attack = FGSM(fool_model)
-#attack = IterativeGradientSignAttack(fool_model)
-#attack = DeepFoolAttack(fool_model)
-#attack = SaliencyMapAttack(fool_model)
-
 print(model_id_1[:-3])
 print(model_id_2[:-3])
 
-images = []
-labels = []
+attack = AttackCarliniWagnerL2(targeted=False, max_steps=1000, search_steps=6, cuda=args.cuda)
+
+data_logits = []
+data_images = []
 
 for i in range(args.data_size):
 
@@ -71,33 +62,44 @@ for i in range(args.data_size):
 
 	clean_sample, target = trainset[index]
 
-	clean_sample, target = clean_sample.unsqueeze(0), np.asarray([target]).reshape(1,1)
+	clean_sample, target = clean_sample.unsqueeze(0), torch.LongTensor([target])
 
 	if args.cuda:
 		clean_sample = clean_sample.cuda(), target.cuda()
 
+	clean_sample, target = Variable(clean_sample), Variable(target)
+
 	if np.random.rand() > 0.5:
 		if np.random.rand() > 0.5:
-			attack_sample = attack_1(image=clean_sample.numpy()[0], label=target[0,0])
+			attack_sample = attack.run(model_1, clean_sample.data, target.data)
 		else:
-			attack_sample = attack_2(image=clean_sample.numpy()[0], label=target[0,0])
-		if attack_sample is not None:
-			image_sample = attack_sample
-			label_sample = np.ones([1])
-		else:
-			image_sample = clean_sample.cpu().numpy()[0]
-			label_sample = np.zeros([1])
+			attack_sample = attack.run(model_2, clean_sample.data, target.data)
+		try:
+			pred_attack_1 = model_1.forward(attack_sample).data.cpu().numpy()
+			pred_attack_2 = model_2.forward(attack_sample).data.cpu().numpy()
+			sample_logits = np.concatenate([pred_attack_1, pred_attack_2, np.ones([1,1])], 1)
+			sample_image = attack_sample.data.contiguous().cpu().numpy()
+		except RuntimeError:
+			pred_clean_1 = model_1.forward(clean_sample).data.cpu().numpy()
+			pred_clean_2 = model_2.forward(clean_sample).data.cpu().numpy()
+			sample_logits = np.concatenate([pred_clean_1, pred_clean_2, np.zeros([1,1])], 1)
+			sample_image = clean_sample.data.cpu().numpy()
 	else:
-		image_sample = clean_sample.cpu().numpy()[0]
-		label_sample = np.zeros([1])
+			pred_clean_1 = model_1.forward(clean_sample).data.cpu().numpy()
+			pred_clean_2 = model_2.forward(clean_sample).data.cpu().numpy()
+			sample_logits = np.concatenate([pred_clean_1, pred_clean_2, np.zeros([1,1])], 1)
+			sample_image = clean_sample.data.cpu().numpy()
 
-	images.append(image_sample)
-	labels.append(label_sample)
+	data_logits.append(sample_logits)
+	data_images.append(sample_image)
 
-images = np.asarray(images)
-labels = np.asarray(labels)
+data_logits = np.asarray(data_logits)
+data_images = np.asarray(data_images)
 
-print('\n')
-print(images.shape, labels.shape)
+pfile = open('./cw_logits.p', 'wb')
+pickle.dump(data_logits.squeeze(), pfile)
+pfile.close()
 
-sio.savemat('./raw_cifar10_igsm.mat', {'images':images, 'labels':labels})
+pfile = open('./cw_images.p', 'wb')
+pickle.dump(data_images.squeeze(), pfile)
+pfile.close()

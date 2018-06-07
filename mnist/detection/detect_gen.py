@@ -13,24 +13,17 @@ rcParams['figure.figsize'] = 15, 10
 
 def calculate_metrics(model, x, y_true):
 
-	tp_class = 0
+	acc = cross_val_score(model, x, y_true, cv=5, scoring='accuracy')
 
-	y_pred = cross_val_predict(model, x, y_true, cv=10)
+	precision = cross_val_score(model, x, y_true, cv=5, scoring='precision')
 
-	y_pred = model.predict(x)
+	recall = cross_val_score(model, x, y_true, cv=5, scoring='recall')
 
-	acc = metrics.accuracy_score(y_true, y_pred)
-	
-	fpr, tpr, thresholds = metrics.roc_curve(y_true, y_pred)
-	auc = metrics.auc(fpr, tpr)
+	f1 = cross_val_score(model, x, y_true, cv=5, scoring='f1')
 
-	precision = metrics.precision_score(y_true, y_pred, pos_label = tp_class, average = 'binary')
+	auc = cross_val_score(model, x, y_true, cv=5, scoring='roc_auc')
 
-	recall = metrics.recall_score(y_true, y_pred, pos_label = tp_class, average = 'binary')
-
-	f1 = metrics.f1_score(y_true, y_pred, pos_label = tp_class, average = 'binary')
-
-	return [acc, precision, recall, f1, auc]
+	return [acc.mean(), precision.mean(), recall.mean(), f1.mean(), auc.mean()]
 
 ###############################################################################
 # Import data set

@@ -40,7 +40,7 @@ if args.model == 'vgg':
 elif args.model == 'resnet':
 	model = resnet.ResNet18(soft=args.soft)
 elif args.model == 'densenet':
-	model = resnet.densenet_cifar(soft=args.soft)
+	model = densenet.densenet_cifar(soft=args.soft)
 
 if args.ngpus > 1:
 	model = torch.nn.DataParallel(model, device_ids=list(range(args.ngpus)))

@@ -11,17 +11,52 @@ import pickle
 from pylab import rcParams
 rcParams['figure.figsize'] = 15, 10
 
+def calculate_metrics(model, x_train, y_train, x_test, y_test, k=5):
+
+	tp_class = 0
+
+	idx = np.split(np.arange(x_test.shape[0]), k)
+
+	model.fit(x_train, y_train)
+
+	acc = []
+	precision = []
+	recall = []
+	f1 = []
+	auc = []
+
+	for idx_ in idx:
+
+		x_test_, y_test_ = x_test[idx_, :], y_test[idx_]
+
+		y_pred, y_score = model.predict(x_test_), model.predict_proba(x_test_)[:,1]
+
+		acc.append( metrics.accuracy_score(y_test_, y_pred) )
+	
+		fpr, tpr, thresholds = metrics.roc_curve(y_test_, y_score)
+		auc.append( metrics.auc(fpr, tpr) )
+
+		precision.append( metrics.precision_score(y_test_, y_pred, pos_label = tp_class, average = 'binary') )
+
+		recall.append( metrics.recall_score(y_test_, y_pred, pos_label = tp_class, average = 'binary') )
+
+		f1.append( metrics.f1_score(y_test_, y_pred, pos_label = tp_class, average = 'binary') )
+
+	return [np.mean(acc), np.mean(precision), np.mean(recall), np.mean(f1), np.mean(auc), np.std(acc), np.std(precision), np.std(recall), np.std(f1), np.std(auc)]
+
+'''
+
 def calculate_metrics(model, x_train, y_train, x_test, y_test):
 
 	tp_class = 0
 
 	model.fit(x_train, y_train)
 
-	y_pred = model.predict(x_test)
+	y_pred, y_score = model.predict(x_test), model.predict_proba(x_test)[:,1]
 
 	acc = metrics.accuracy_score(y_test, y_pred)
 	
-	fpr, tpr, thresholds = metrics.roc_curve(y_test, y_pred)
+	fpr, tpr, thresholds = metrics.roc_curve(y_test, y_score)
 	auc = metrics.auc(fpr, tpr)
 
 	precision = metrics.precision_score(y_test, y_pred, pos_label = tp_class, average = 'binary')
@@ -31,11 +66,12 @@ def calculate_metrics(model, x_train, y_train, x_test, y_test):
 	f1 = metrics.f1_score(y_test, y_pred, pos_label = tp_class, average = 'binary')
 
 	return [acc, precision, recall, f1, auc]
+'''
 
 ###############################################################################
 # Import data set
 
-pfile = open('detec_deepfool.p', 'rb')
+pfile = open('detec_saltandpepper.p', 'rb')
 data = pickle.load(pfile)
 pfile.close()
 
@@ -49,25 +85,27 @@ X = min_max_scaler.fit_transform(X)
 
 X_train, Y_train = X, y
 
-pfile = open('detec_saltandpepper.p', 'rb')
-data = pickle.load(pfile)
-pfile.close()
+pfile_ = open('detec_deepfool.p', 'rb')
+data_ = pickle.load(pfile_)
+pfile_.close()
 
-X=data[:, :-1]
-y=data[:, -1]
+X_=data_[:, :-1]
+y_=data_[:, -1]
 
 #Scaling Data Set into [0,1]
 
-X = min_max_scaler.fit_transform(X)
+X_ = min_max_scaler.fit_transform(X_)
 
-X_test, Y_test = X, y
+X_test, Y_test = X_, y_
+
+#Y_test=np.round(np.random.rand(Y_test.shape[0]))
 
 ###############################################################################
 # Instantiate models
 
 forest = RandomForestClassifier(n_estimators=10)
 neigh = KNeighborsClassifier(n_neighbors=3)
-svc_rbf3 = SVC(kernel='rbf', C=100.0, gamma=0.1)
+svc_rbf3 = SVC(kernel='rbf', C=100.0, gamma=0.1, probability=True)
 
 ###############################################################################
 # Printing/Plotting Results

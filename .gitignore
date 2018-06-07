@@ -9,3 +9,9 @@
 *.tar
 *.gz
 *.p
+*.mat
+*.jpg
+*.csv*
+*.ods*
+*.xls*
+*.xls
