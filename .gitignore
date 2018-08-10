@@ -5,7 +5,7 @@
 *.png
 *.jpeg
 *.bmp
-*ubyte
+*ubyte*
 *.tar
 *.gz
 *.p
@@ -15,3 +15,9 @@
 *.ods*
 *.xls*
 *.xls
+*.zip
+*.tar*
+*.rar
+*.JPEG
+*.JPG
+*.PNG

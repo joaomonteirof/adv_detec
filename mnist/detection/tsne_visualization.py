@@ -11,7 +11,7 @@ rcParams['figure.figsize'] = 15, 10
 
 ###############################################################################
 # Import data set
-pfile = open('detec_mnist_igsm.p', 'rb')
+pfile = open('detect_cw.p', 'rb')
 data = pickle.load(pfile)
 pfile.close()
 

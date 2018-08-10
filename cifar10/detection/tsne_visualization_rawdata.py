@@ -11,12 +11,16 @@ rcParams['figure.figsize'] = 15, 10
 
 ###############################################################################
 # Import data set
-pfile = open('detec_raw.p', 'rb')
+pfile = open('cw_images_cifar.p', 'rb')
+X = pickle.load(pfile)
+pfile.close()
+
+pfile = open('detect_cw.p', 'rb')
 data = pickle.load(pfile)
 pfile.close()
 
-X=data[:, :-4]
-y=data[:, -4]
+X = X.reshape(X.shape[0], -1)
+y=data[:, -1].ravel()
 
 #Scaling Data Set into [0,1]
 

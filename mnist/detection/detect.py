@@ -28,7 +28,7 @@ def calculate_metrics(model, x, y_true):
 ###############################################################################
 # Import data set
 
-pfile = open('detec_mnist_saltandpepper.p', 'rb')
+pfile = open('detect_cw.p', 'rb')
 data = pickle.load(pfile)
 pfile.close()
 
