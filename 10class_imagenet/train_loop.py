@@ -36,7 +36,6 @@ class TrainLoop(object):
 			self.load_checkpoint(self.save_epoch_fmt.format(checkpoint_epoch))
 			self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[10, 50, 100, 150, 200, 400, 450], gamma=0.5, last_epoch=checkpoint_epoch)
 		else:
-			self.initialize_params()
 			self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[10, 50, 100, 150, 200, 400, 450], gamma=0.5)
 
 	def train(self, n_epochs=1):
@@ -108,7 +107,7 @@ class TrainLoop(object):
 
 		self.optimizer.step()
 
-		return loss.data[0]
+		return loss.item()
 
 	def valid(self, batch):
 
@@ -126,11 +125,12 @@ class TrainLoop(object):
 		out = self.model.forward(x)
 
 		pred = out.data.max(1)[1]
-		correct = pred.eq(y.data).cpu().sum()
+
+		correct = pred.eq(y.data).cpu().sum().item()
 
 		loss = torch.nn.functional.cross_entropy(out, y)
 
-		return loss.data[0], correct
+		return loss.item(), correct
 
 	def checkpointing(self):
 
@@ -176,11 +176,3 @@ class TrainLoop(object):
 				print('params NANs!!!!!')
 			if np.any(np.isnan(params.grad.data.cpu().numpy())):
 				print('grads NANs!!!!!!')
-
-	def initialize_params(self):
-		for layer in self.model.modules():
-			if isinstance(layer, torch.nn.Conv2d):
-				init.kaiming_normal(layer.weight.data)
-			elif isinstance(layer, torch.nn.BatchNorm2d):
-				layer.weight.data.fill_(1)
-				layer.bias.data.zero_()

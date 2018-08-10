@@ -126,7 +126,7 @@ class TrainLoop(object):
 		out = self.model.forward(x)
 
 		pred = out.data.max(1)[1]
-		correct = pred.eq(y.data).cpu().sum()
+		correct = pred.eq(y.data).cpu().sum().item()
 
 		loss = torch.nn.functional.nll_loss(out, y)
 

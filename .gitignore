@@ -21,3 +21,8 @@
 *.JPEG
 *.JPG
 *.PNG
+*/data/
+*.gif
+*.GIF
+*.php
+*.html

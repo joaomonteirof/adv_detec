@@ -3,8 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class resnet(nn.Module):
-	def __init__(self, resnet):
-		super(feat_model, self).__init__()
+	def __init__(self, feat_model):
+		super(resnet, self).__init__()
 
 		self.features = feat_model
 
@@ -27,8 +27,8 @@ class resnet(nn.Module):
 		return x
 
 class vgg(nn.Module):
-	def __init__(self, vgg):
-		super(feat_model, self).__init__()
+	def __init__(self, feat_model):
+		super(vgg, self).__init__()
 
 		self.features = feat_model
 
