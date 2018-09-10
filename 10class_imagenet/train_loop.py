@@ -20,7 +20,7 @@ class TrainLoop(object):
 			if not os.path.isdir(self.checkpoint_path):
 				os.mkdir(self.checkpoint_path)
 
-		self.save_epoch_fmt = os.path.join(self.checkpoint_path, 'checkpoint_{}ep.pt')
+		self.save_epoch_fmt = os.path.join(self.checkpoint_path, 'checkpoint.pt')
 		self.cuda_mode = cuda
 		self.model = model
 		self.optimizer = optimizer
@@ -32,8 +32,8 @@ class TrainLoop(object):
 		self.its_without_improv = 0
 		self.last_best_val_loss = float('inf')
 
-		if checkpoint_epoch is not None:
-			self.load_checkpoint(self.save_epoch_fmt.format(checkpoint_epoch))
+		#if checkpoint_epoch is not None:
+			#self.load_checkpoint(self.save_epoch_fmt.format(checkpoint_epoch))
 			#self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[10, 50, 100, 150, 200, 400, 450], gamma=0.5, last_epoch=checkpoint_epoch)
 		#else:
 			#self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[10, 50, 100, 150, 200, 400, 450], gamma=0.5)
@@ -79,10 +79,8 @@ class TrainLoop(object):
 				self.last_best_val_loss = valid_loss
 
 		# saving final models
-		self.checkpointing()
-		print('Saving final model...')
-
-		torch.save(self.model.state_dict(), './final_model.pt')
+		#self.checkpointing()
+		#print('Saving final model...')
 
 	def train_step(self, batch):
 
@@ -143,7 +141,7 @@ class TrainLoop(object):
 		'cur_epoch': self.cur_epoch,
 		'its_without_improve': self.its_without_improv,
 		'last_best_val_loss': self.last_best_val_loss}
-		torch.save(ckpt, self.save_epoch_fmt.format(self.cur_epoch))
+		torch.save(ckpt, self.save_epoch_fmt)
 
 	def load_checkpoint(self, ckpt):
 
