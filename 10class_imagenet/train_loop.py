@@ -32,18 +32,18 @@ class TrainLoop(object):
 		self.its_without_improv = 0
 		self.last_best_val_loss = float('inf')
 
-		#if checkpoint_epoch is not None:
-			#self.load_checkpoint(self.save_epoch_fmt.format(checkpoint_epoch))
-			#self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[10, 50, 100, 150, 200, 400, 450], gamma=0.5, last_epoch=checkpoint_epoch)
-		#else:
-			#self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[10, 50, 100, 150, 200, 400, 450], gamma=0.5)
+		if checkpoint_epoch is not None:
+			self.load_checkpoint(self.save_epoch_fmt.format(checkpoint_epoch))
+			self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[50, 400], gamma=0.1, last_epoch=checkpoint_epoch)
+		else:
+			self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[50, 400], gamma=0.1)
 
 	def train(self, n_epochs=1):
 
 		while self.cur_epoch < n_epochs:
 			print('Epoch {}/{}'.format(self.cur_epoch+1, n_epochs))
 			train_iter = tqdm(enumerate(self.train_loader))
-			#self.scheduler.step()
+			self.scheduler.step()
 			train_loss = 0.0
 			valid_loss = 0.0
 
