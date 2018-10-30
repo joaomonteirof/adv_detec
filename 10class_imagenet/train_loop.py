@@ -41,7 +41,7 @@ class TrainLoop(object):
 		while self.cur_epoch < n_epochs:
 			print('Epoch {}/{}'.format(self.cur_epoch+1, n_epochs))
 			train_iter = tqdm(enumerate(self.train_loader))
-			self.scheduler.step()
+
 			train_loss = 0.0
 			valid_loss = 0.0
 
@@ -77,10 +77,6 @@ class TrainLoop(object):
 				self.checkpointing()
 				self.its_without_improv = 0
 				self.last_best_val_loss = self.history['valid_er'][-1]
-
-		# saving final models
-		#self.checkpointing()
-		#print('Saving final model...')
 
 	def train_step(self, batch):
 
