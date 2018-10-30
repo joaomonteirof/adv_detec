@@ -67,7 +67,7 @@ class TrainLoop(object):
 
 			print('Total train loss: {}'.format(self.history['train_loss'][-1]))
 			print('Total valid loss: {}'.format(self.history['valid_loss'][-1]))
-			print('Accuracy on validation set: {}'.format(self.history['valid_er'][-1]))
+			print('Error rate on validation set: {}'.format(self.history['valid_er'][-1]))
 
 			self.scheduler.step(self.history['valid_er'][-1])
 
