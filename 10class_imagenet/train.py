@@ -47,7 +47,8 @@ elif args.model == 'resnet':
 if args.cuda:
 	model = model.cuda()
 
-optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
+#optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
+optimizer = optim.RMSprop(model.parameters(), lr=args.lr)
 
 trainer = TrainLoop(model, optimizer, train_loader, valid_loader, checkpoint_path=args.checkpoint_path, checkpoint_epoch=args.checkpoint_epoch, cuda=args.cuda)
 
