@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 class TrainLoop(object):
 
-	def __init__(self, model, optimizer, train_loader, valid_loader, checkpoint_path=None, checkpoint_epoch=None, cuda=True):
+	def __init__(self, model, optimizer, train_loader, valid_loader, patience, checkpoint_path=None, checkpoint_epoch=None, cuda=True):
 		if checkpoint_path is None:
 			# Save to current directory
 			self.checkpoint_path = os.getcwd()
@@ -26,17 +26,15 @@ class TrainLoop(object):
 		self.optimizer = optimizer
 		self.train_loader = train_loader
 		self.valid_loader = valid_loader
-		self.history = {'train_loss': [], 'valid_loss': [], 'valid_acc': []}
+		self.history = {'train_loss': [], 'valid_loss': [], 'valid_er': []}
 		self.total_iters = 0
 		self.cur_epoch = 0
 		self.its_without_improv = 0
 		self.last_best_val_loss = float('inf')
+		self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, factor=0.5, patience=patience, verbose=True, threshold=1e-4, min_lr=1e-6)
 
 		if checkpoint_epoch is not None:
 			self.load_checkpoint(self.save_epoch_fmt.format(checkpoint_epoch))
-			self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[50, 400], gamma=0.1, last_epoch=checkpoint_epoch)
-		else:
-			self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[50, 400], gamma=0.1)
 
 	def train(self, n_epochs=1):
 
@@ -65,18 +63,20 @@ class TrainLoop(object):
 				tot_correct += correct
 
 			self.history['valid_loss'].append(valid_loss/(t+1))
-			self.history['valid_acc'].append(tot_correct/len(self.valid_loader.dataset))
+			self.history['valid_er'].append(1.-tot_correct/len(self.valid_loader.dataset))
 
 			print('Total train loss: {}'.format(self.history['train_loss'][-1]))
 			print('Total valid loss: {}'.format(self.history['valid_loss'][-1]))
-			print('Accuracy on validation set: {}'.format(self.history['valid_acc'][-1]))
+			print('Accuracy on validation set: {}'.format(self.history['valid_er'][-1]))
+
+			self.scheduler.step(self.history['valid_er'][-1])
 
 			self.cur_epoch += 1
 
-			if valid_loss < self.last_best_val_loss:
+			if self.history['valid_er'][-1] < self.last_best_val_loss:
 				self.checkpointing()
 				self.its_without_improv = 0
-				self.last_best_val_loss = valid_loss
+				self.last_best_val_loss = self.history['valid_er'][-1]
 
 		# saving final models
 		#self.checkpointing()

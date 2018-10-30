@@ -16,7 +16,7 @@ parser.add_argument('--batch-size', type=int, default=64, metavar='N', help='inp
 parser.add_argument('--valid-batch-size', type=int, default=64, metavar='N', help='input batch size for testing (default: 64)')
 parser.add_argument('--epochs', type=int, default=500, metavar='N', help='number of epochs to train (default: 500)')
 parser.add_argument('--lr', type=float, default=0.0001, metavar='LR', help='learning rate (default: 0.00005)')
-parser.add_argument('--momentum', type=float, default=0.9, metavar='lambda', help='Momentum (default: 0.9)')
+parser.add_argument('--patience', type=int, default=30, metavar='S', help='Epochs to wait before decreasing LR (default: 30)')
 parser.add_argument('--checkpoint-epoch', type=int, default=None, metavar='N', help='epoch to load for checkpointing. If None, training starts from scratch')
 parser.add_argument('--checkpoint-path', type=str, default=None, metavar='Path', help='Path for checkpointing')
 parser.add_argument('--seed', type=int, default=42, metavar='S', help='random seed (default: 42)')
@@ -47,10 +47,9 @@ elif args.model == 'resnet':
 if args.cuda:
 	model = model.cuda()
 
-#optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
-optimizer = optim.RMSprop(model.parameters(), lr=args.lr)
+optimizer = optim.RMSprop(model.parameters(), lr=args.lr, momentum=args.momentum)
 
-trainer = TrainLoop(model, optimizer, train_loader, valid_loader, checkpoint_path=args.checkpoint_path, checkpoint_epoch=args.checkpoint_epoch, cuda=args.cuda)
+trainer = TrainLoop(model, optimizer, train_loader, valid_loader, checkpoint_path=args.checkpoint_path, checkpoint_epoch=args.checkpoint_epoch, patience=args.patience, cuda=args.cuda)
 
 print('Selected model: {}'.format(args.model))
 print('Cuda Mode is: {}'.format(args.cuda))
