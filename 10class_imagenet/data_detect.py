@@ -28,7 +28,9 @@ torch.manual_seed(args.seed)
 if args.cuda:
     torch.cuda.manual_seed(args.seed)
 
-trainset = datasets.ImageFolder(args.data_path, transform=transforms.ToTensor())
+data_transform = transforms.Compose([transforms.RandomResizedCrop(224), transforms.RandomHorizontalFlip(), transforms.ToTensor()])
+
+trainset = datasets.ImageFolder(args.data_path, transform=data_transform)
 
 features_model_1 = torchvision.models.vgg19_bn(pretrained=False)
 features_model_2 = torchvision.models.resnet50(pretrained=False)
@@ -50,10 +52,16 @@ model_2.eval()
 if args.cuda:
 	model_1.cuda()
 	model_2.cuda()
+else:
+	model_1.cpu()
+	model_2.cpu()
 
-fool_model_1 = PyTorchModel(model_1, bounds=(0,1), num_classes=10)
+mean = np.array([0.485, 0.456, 0.406]).reshape((3, 1, 1))
+std = np.array([0.229, 0.224, 0.225]).reshape((3, 1, 1))
+
+fool_model_1 = PyTorchModel(model_1, bounds=(0,1), num_classes=10, preprocessing=(mean, std))
 attack_1 = FGSM(fool_model_1)
-fool_model_2 = PyTorchModel(model_2, bounds=(0,1), num_classes=10)
+fool_model_2 = PyTorchModel(model_2, bounds=(0,1), num_classes=10, preprocessing=(mean, std))
 attack_2 = FGSM(fool_model_2)
 #attack = FGSM(fool_model)
 #attack = IterativeGradientSignAttack(fool_model)
@@ -81,20 +89,20 @@ for i in range(args.data_size):
 
 	if np.random.rand() > 0.5:
 		if np.random.rand() > 0.5:
-			attack_sample = attack_1(input_or_adv=clean_sample.numpy()[0], label=target[0,0])
+			attack_sample = attack_1(input_or_adv=clean_sample.cpu().numpy()[0], label=target[0,0])
 		else:
-			attack_sample = attack_2(input_or_adv=clean_sample.numpy()[0], label=target[0,0])
+			attack_sample = attack_2(input_or_adv=clean_sample.cpu().numpy()[0], label=target[0,0])
 		try:
-			pred_attack_1 = model_1.forward(Variable(torch.from_numpy(attack_sample).unsqueeze(0), requires_grad=False)).data.cpu().numpy()
-			pred_attack_2 = model_2.forward(Variable(torch.from_numpy(attack_sample).unsqueeze(0), requires_grad=False)).data.cpu().numpy()
+			pred_attack_1 = model_1.forward(torch.from_numpy(attack_sample).unsqueeze(0)).detach().cpu().numpy()
+			pred_attack_2 = model_2.forward(torch.from_numpy(attack_sample).unsqueeze(0)).detach().cpu().numpy()
 			sample = np.concatenate([pred_attack_1, pred_attack_2, np.ones([1,1])], 1)
 		except:
-			pred_clean_1 = model_1.forward(Variable(clean_sample, requires_grad=False)).data.cpu().numpy()
-			pred_clean_2 = model_2.forward(Variable(clean_sample, requires_grad=False)).data.cpu().numpy()
+			pred_clean_1 = model_1.forward(clean_sample).detach().cpu().numpy()
+			pred_clean_2 = model_2.forward(clean_sample).detach().cpu().numpy()
 			sample = np.concatenate([pred_clean_1, pred_clean_2, np.zeros([1,1])], 1)
 	else:
-			pred_clean_1 = model_1.forward(Variable(clean_sample, requires_grad=False)).data.cpu().numpy()
-			pred_clean_2 = model_2.forward(Variable(clean_sample, requires_grad=False)).data.cpu().numpy()
+			pred_clean_1 = model_1.forward(clean_sample).detach().cpu().numpy()
+			pred_clean_2 = model_2.forward(clean_sample).detach().cpu().numpy()
 			sample = np.concatenate([pred_clean_1, pred_clean_2, np.zeros([1,1])], 1)
 
 	data.append(sample)
