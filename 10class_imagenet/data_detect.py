@@ -84,15 +84,17 @@ for i in range(args.data_size):
 
 	clean_sample, target = clean_sample.unsqueeze(0), np.asarray([target]).reshape(1,1)
 
-	if args.cuda:
-		clean_sample = clean_sample.cuda(), target.cuda()
-
 	if np.random.rand() > 0.5:
 		if np.random.rand() > 0.5:
 			attack_sample = attack_1(input_or_adv=clean_sample.cpu().numpy()[0], label=target[0,0])
 		else:
 			attack_sample = attack_2(input_or_adv=clean_sample.cpu().numpy()[0], label=target[0,0])
+
+		if args.cuda:
+			clean_sample = clean_sample.cuda()
+
 		try:
+
 			pred_attack_1 = model_1.forward(torch.from_numpy(attack_sample).unsqueeze(0)).detach().cpu().numpy()
 			pred_attack_2 = model_2.forward(torch.from_numpy(attack_sample).unsqueeze(0)).detach().cpu().numpy()
 			sample = np.concatenate([pred_attack_1, pred_attack_2, np.ones([1,1])], 1)
