@@ -16,7 +16,9 @@ elif args.model == 'resnet':
 	features_model = torchvision.models.resnet50(pretrained=False)
 	model = resnet(features_model)
 
-data = torch.rand(10,3,224,224)
+data = torch.rand(2,3,224,224)
+
+print(model)
 
 print(data.size())
 

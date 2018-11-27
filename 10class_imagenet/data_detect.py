@@ -50,11 +50,11 @@ model_2.load_state_dict(mod_state_2['model_state'])
 model_2.eval()
 
 if args.cuda:
-	model_1.cuda()
-	model_2.cuda()
+	model_1=model_1.cuda()
+	model_2=model_2.cuda()
 else:
-	model_1.cpu()
-	model_2.cpu()
+	model_1=model_1.cpu()
+	model_2=model_2.cpu()
 
 mean = np.array([0.485, 0.456, 0.406]).reshape((3, 1, 1))
 std = np.array([0.229, 0.224, 0.225]).reshape((3, 1, 1))
@@ -103,9 +103,13 @@ for i in range(args.data_size):
 			pred_clean_2 = model_2.forward(clean_sample).detach().cpu().numpy()
 			sample = np.concatenate([pred_clean_1, pred_clean_2, np.zeros([1,1])], 1)
 	else:
-			pred_clean_1 = model_1.forward(clean_sample).detach().cpu().numpy()
-			pred_clean_2 = model_2.forward(clean_sample).detach().cpu().numpy()
-			sample = np.concatenate([pred_clean_1, pred_clean_2, np.zeros([1,1])], 1)
+
+		if args.cuda:
+			clean_sample = clean_sample.cuda()
+
+		pred_clean_1 = model_1.forward(clean_sample).detach().cpu().numpy()
+		pred_clean_2 = model_2.forward(clean_sample).detach().cpu().numpy()
+		sample = np.concatenate([pred_clean_1, pred_clean_2, np.zeros([1,1])], 1)
 
 	data.append(sample)
 
