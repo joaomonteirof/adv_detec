@@ -16,6 +16,7 @@ import sys
 
 # Training settings
 parser = argparse.ArgumentParser(description='Adversarial/clean Cifar10 samples')
+parser.add_argument('--data-path', type=str, default='./data/train/', metavar='Path', help='Path to data')
 parser.add_argument('--data-size', type=int, default=10000, metavar='N', help='Number of samples in the final dataset (default: 1e4)')
 parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
 parser.add_argument('--seed', type=int, default=1, metavar='S', help='random seed (default: 1)')
@@ -27,7 +28,7 @@ torch.manual_seed(args.seed)
 if args.cuda:
     torch.cuda.manual_seed(args.seed)
 
-trainset = datasets.ImageFolder(args.train_data_path, transform=transforms.ToTensor())
+trainset = datasets.ImageFolder(args.data_path, transform=transforms.ToTensor())
 
 features_model_1 = torchvision.models.vgg19_bn(pretrained=False)
 features_model_2 = torchvision.models.resnet50(pretrained=False)
