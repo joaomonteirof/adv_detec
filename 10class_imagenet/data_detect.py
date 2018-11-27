@@ -78,7 +78,7 @@ for i in range(args.data_size):
 	sys.stdout.flush()
 	sys.stdout.write('\rSample {}/{}'.format(i+1, args.data_size))
 
-	index = i + np.random.randint(10)
+	index = (i + np.random.randint(10))%len(trainset)
 
 	clean_sample, target = trainset[index]
 
