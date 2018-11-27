@@ -2,11 +2,12 @@ from __future__ import print_function
 import argparse
 import numpy as np
 import torch
+import torchvision
 import torch.nn.functional as F
 import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.autograd import Variable
-from models import vgg, resnet, densenet
+from models import vgg, resnet
 import pickle
 import foolbox
 from foolbox.models import PyTorchModel
@@ -19,7 +20,6 @@ parser.add_argument('--data-size', type=int, default=10000, metavar='N', help='N
 parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
 parser.add_argument('--seed', type=int, default=1, metavar='S', help='random seed (default: 1)')
 parser.add_argument('--model-path', type=str, default='./trained_models/', metavar='Path', help='Path for model load')
-parser.add_argument('--soft', action='store_true', default=False, help='Adds extra softmax layer')
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 
@@ -27,13 +27,17 @@ torch.manual_seed(args.seed)
 if args.cuda:
     torch.cuda.manual_seed(args.seed)
 
-trainset = datasets.CIFAR10(root='./data', train=True, download=True, transform=transforms.ToTensor())
+trainset = datasets.ImageFolder(args.train_data_path, transform=transforms.ToTensor())
 
-model_1 = vgg.VGG('VGG16', soft=args.soft)
-model_2 = resnet.ResNet18(soft=args.soft)
+features_model_1 = torchvision.models.vgg19_bn(pretrained=False)
+features_model_2 = torchvision.models.resnet50(pretrained=False)
+model = vgg(features_model)
 
-model_id_1 = args.model_path + 'cifar_vgg' + ('_soft' if args.soft else '') + '.pt'
-model_id_2 = args.model_path + 'cifar_resnet' + ('_soft' if args.soft else '') + '.pt'
+model_1 = vgg(features_model_1)
+model_2 = resnet(features_model_2)
+
+model_id_1 = args.model_path + 'img_vgg.pt'
+model_id_2 = args.model_path + 'img_resnet.pt'
 
 mod_state_1 = torch.load(model_id_1, map_location = lambda storage, loc: storage)
 model_1.load_state_dict(mod_state_1['model_state'])
@@ -48,9 +52,9 @@ if args.cuda:
 	model_2.cuda()
 
 fool_model_1 = PyTorchModel(model_1, bounds=(0,1), num_classes=10)
-attack_1 = AdditiveGaussianNoiseAttack(fool_model_1)
+attack_1 = FGSM(fool_model_1)
 fool_model_2 = PyTorchModel(model_2, bounds=(0,1), num_classes=10)
-attack_2 = AdditiveGaussianNoiseAttack(fool_model_2)
+attack_2 = FGSM(fool_model_2)
 #attack = FGSM(fool_model)
 #attack = IterativeGradientSignAttack(fool_model)
 #attack = DeepFoolAttack(fool_model)
@@ -97,6 +101,6 @@ for i in range(args.data_size):
 
 data = np.asarray(data)
 
-pfile = open('./detec_cw.p', 'wb')
+pfile = open('./detec_fgsm.p', 'wb')
 pickle.dump(data.squeeze(), pfile)
 pfile.close()
