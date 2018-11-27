@@ -32,7 +32,6 @@ trainset = datasets.ImageFolder(args.data_path, transform=transforms.ToTensor())
 
 features_model_1 = torchvision.models.vgg19_bn(pretrained=False)
 features_model_2 = torchvision.models.resnet50(pretrained=False)
-model = vgg(features_model)
 
 model_1 = vgg(features_model_1)
 model_2 = resnet(features_model_2)
