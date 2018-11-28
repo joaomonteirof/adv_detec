@@ -62,6 +62,8 @@ for att in id2att.keys():
 
 	args.attack = att
 
+	print('generating attack: ' + att)
+
 	if args.attack == 'igsm':
 		attack_1 = id2att[args.attack](fool_model_1, distance=foolbox.distances.Linfinity)
 		attack_2 = id2att[args.attack](fool_model_2, distance=foolbox.distances.Linfinity)

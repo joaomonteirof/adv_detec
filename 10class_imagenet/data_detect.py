@@ -26,6 +26,8 @@ parser.add_argument('--attack', choices=['fgsm', 'igsm', 'jsma', 'deepfool', 'cw
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 
+print('generating attack: ' + args.attack)
+
 id2att = {'fgsm':FGSM, 'igsm':LinfinityBasicIterativeAttack, 'jsma':SaliencyMapAttack, 'deepfool':DeepFoolAttack, 'cw':CarliniWagnerL2Attack, 'gaussianblur':GaussianBlurAttack, 'gaussiannoise':AdditiveGaussianNoiseAttack, 's:AdditiveGaussianNoiseAttackaltandpepper':SaltAndPepperNoiseAttack}
 
 torch.manual_seed(args.seed)
