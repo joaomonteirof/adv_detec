@@ -59,12 +59,12 @@ else:
 mean = np.array([0.485, 0.456, 0.406]).reshape((3, 1, 1))
 std = np.array([0.229, 0.224, 0.225]).reshape((3, 1, 1))
 
-fool_model_1 = PyTorchModel(model_1, bounds=(0,1), num_classes=10, preprocessing=(mean, std))
-#attack_1 = LinfinityBasicIterativeAttack(fool_model_1)
-attack_1 = LinfinityBasicIterativeAttack(fool_model_1, distance=foolbox.distances.Linfinity)
-fool_model_2 = PyTorchModel(model_2, bounds=(0,1), num_classes=10, preprocessing=(mean, std))
-#attack_2 = LinfinityBasicIterativeAttack(fool_model_2)
-attack_2 = LinfinityBasicIterativeAttack(fool_model_2, distance=foolbox.distances.Linfinity)
+fool_model_1 = PyTorchModel(model_1, bounds=(0,1), num_classes=10)
+attack_1 = SaliencyMapAttack(fool_model_1)
+#attack_1 = LinfinityBasicIterativeAttack(fool_model_1, distance=foolbox.distances.Linfinity)
+fool_model_2 = PyTorchModel(model_2, bounds=(0,1), num_classes=10)
+attack_2 = SaliencyMapAttack(fool_model_2)
+#attack_2 = LinfinityBasicIterativeAttack(fool_model_2, distance=foolbox.distances.Linfinity)
 #attack = FGSM(fool_model)
 #attack = IterativeGradientSignAttack(fool_model)
 #attack = DeepFoolAttack(fool_model)
@@ -96,7 +96,6 @@ for i in range(args.data_size):
 			clean_sample = clean_sample.cuda()
 
 		try:
-
 			pred_attack_1 = model_1.forward(torch.from_numpy(attack_sample).unsqueeze(0)).detach().cpu().numpy()
 			pred_attack_2 = model_2.forward(torch.from_numpy(attack_sample).unsqueeze(0)).detach().cpu().numpy()
 			sample = np.concatenate([pred_attack_1, pred_attack_2, np.ones([1,1])], 1)
@@ -117,6 +116,6 @@ for i in range(args.data_size):
 
 data = np.asarray(data)
 
-pfile = open('./detec_igsm.p', 'wb')
+pfile = open('./detec_jsma.p', 'wb')
 pickle.dump(data.squeeze(), pfile)
 pfile.close()
