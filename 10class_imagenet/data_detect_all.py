@@ -22,7 +22,6 @@ parser.add_argument('--data-size', type=int, default=10000, metavar='N', help='N
 parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
 parser.add_argument('--seed', type=int, default=1, metavar='S', help='random seed (default: 1)')
 parser.add_argument('--model-path', type=str, default='./trained_models/', metavar='Path', help='Path for model load')
-parser.add_argument('--attack', choices=['fgsm', 'igsm', 'jsma', 'deepfool', 'cw', 'gaussianblur', 'gaussiannoise', 'saltandpepper'], default='fgsm')
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 
@@ -59,45 +58,58 @@ std = np.array([0.229, 0.224, 0.225]).reshape((3, 1, 1))
 fool_model_1 = PyTorchModel(model_1, bounds=(0,1), num_classes=10, preprocessing=(mean, std), device='cuda:0' if args.cuda else 'cpu')
 fool_model_2 = PyTorchModel(model_2, bounds=(0,1), num_classes=10, preprocessing=(mean, std), device='cuda:0' if args.cuda else 'cpu')
 
-if args.attack == 'igsm':
-	attack_1 = id2att[args.attack](fool_model_1, distance=foolbox.distances.Linfinity)
-	attack_2 = id2att[args.attack](fool_model_2, distance=foolbox.distances.Linfinity)
-else:
-	attack_1 = id2att[args.attack](fool_model_1)
-	attack_2 = id2att[args.attack](fool_model_2)
+for att in id2att.keys():
 
-data = []
-images = []
+	args.attack = att
 
-for i in range(args.data_size):
+	if args.attack == 'igsm':
+		attack_1 = id2att[args.attack](fool_model_1, distance=foolbox.distances.Linfinity)
+		attack_2 = id2att[args.attack](fool_model_2, distance=foolbox.distances.Linfinity)
+	else:
+		attack_1 = id2att[args.attack](fool_model_1)
+		attack_2 = id2att[args.attack](fool_model_2)
 
-	sys.stdout.flush()
-	sys.stdout.write('\rSample {}/{}'.format(i+1, args.data_size))
+	data = []
+	images = []
 
-	index = (i + np.random.randint(10))%len(trainset)
+	for i in range(args.data_size):
 
-	clean_sample, target = trainset[index]
+		sys.stdout.flush()
+		sys.stdout.write('\rSample {}/{}'.format(i+1, args.data_size))
 
-	clean_sample, target = clean_sample.unsqueeze(0), np.asarray([target]).reshape(1,1)
+		index = (i + np.random.randint(10))%len(trainset)
 
-	if np.random.rand() > 0.5:
+		clean_sample, target = trainset[index]
+
+		clean_sample, target = clean_sample.unsqueeze(0), np.asarray([target]).reshape(1,1)
+
 		if np.random.rand() > 0.5:
-			attack_sample = attack_1(input_or_adv=clean_sample.cpu().numpy()[0], label=target[0,0])
+			if np.random.rand() > 0.5:
+				attack_sample = attack_1(input_or_adv=clean_sample.cpu().numpy()[0], label=target[0,0])
+			else:
+				attack_sample = attack_2(input_or_adv=clean_sample.cpu().numpy()[0], label=target[0,0])
+
+			try:
+
+				attack_sample = torch.from_numpy((attack_sample-mean)/std).unsqueeze(0).float()
+
+				if args.cuda:
+					attack_sample = attack_sample.cuda()
+
+				pred_attack_1 = model_1.forward(attack_sample).detach().cpu().numpy()
+				pred_attack_2 = model_2.forward(attack_sample).detach().cpu().numpy()
+				sample = np.concatenate([pred_attack_1, pred_attack_2, np.ones([1,1])], 1)
+				image_sample = attack_sample.cpu().numpy()[0]
+			except:
+
+				if args.cuda:
+					clean_sample = clean_sample.cuda()
+
+				pred_clean_1 = model_1.forward(clean_sample).detach().cpu().numpy()
+				pred_clean_2 = model_2.forward(clean_sample).detach().cpu().numpy()
+				sample = np.concatenate([pred_clean_1, pred_clean_2, np.zeros([1,1])], 1)
+				image_sample = clean_sample.cpu().numpy()[0]
 		else:
-			attack_sample = attack_2(input_or_adv=clean_sample.cpu().numpy()[0], label=target[0,0])
-
-		try:
-
-			attack_sample = torch.from_numpy((attack_sample-mean)/std).unsqueeze(0).float()
-
-			if args.cuda:
-				attack_sample = attack_sample.cuda()
-
-			pred_attack_1 = model_1.forward(attack_sample).detach().cpu().numpy()
-			pred_attack_2 = model_2.forward(attack_sample).detach().cpu().numpy()
-			sample = np.concatenate([pred_attack_1, pred_attack_2, np.ones([1,1])], 1)
-			image_sample = attack_sample.cpu().numpy()[0]
-		except:
 
 			if args.cuda:
 				clean_sample = clean_sample.cuda()
@@ -106,37 +118,28 @@ for i in range(args.data_size):
 			pred_clean_2 = model_2.forward(clean_sample).detach().cpu().numpy()
 			sample = np.concatenate([pred_clean_1, pred_clean_2, np.zeros([1,1])], 1)
 			image_sample = clean_sample.cpu().numpy()[0]
-	else:
 
-		if args.cuda:
-			clean_sample = clean_sample.cuda()
+		data.append(sample)
+		images.append(image_sample)
 
-		pred_clean_1 = model_1.forward(clean_sample).detach().cpu().numpy()
-		pred_clean_2 = model_2.forward(clean_sample).detach().cpu().numpy()
-		sample = np.concatenate([pred_clean_1, pred_clean_2, np.zeros([1,1])], 1)
-		image_sample = clean_sample.cpu().numpy()[0]
+	data = np.asarray(data)
+	image_data = np.asarray(images)
 
-	data.append(sample)
-	images.append(image_sample)
+	data_file = './detec_'+args.attack+'.p'
+	image_data_file = './raw_imgnet_'+args.attack+'.p'
 
-data = np.asarray(data)
-image_data = np.asarray(images)
+	if os.path.isfile(data_file):
+		os.remove(data_file)
+		print(data_file+' Removed')
 
-data_file = './detec_'+args.attack+'.p'
-image_data_file = './raw_imgnet_'+args.attack+'.p'
+	if os.path.isfile(image_data_file):
+		os.remove(image_data_file)
+		print(image_data_file+' Removed')
 
-if os.path.isfile(data_file):
-	os.remove(data_file)
-	print(data_file+' Removed')
+	pfile = open(data_file, 'wb')
+	pickle.dump(data.squeeze(), pfile)
+	pfile.close()
 
-if os.path.isfile(image_data_file):
-	os.remove(image_data_file)
-	print(image_data_file+' Removed')
-
-pfile = open(data_file, 'wb')
-pickle.dump(data.squeeze(), pfile)
-pfile.close()
-
-pfile = open(image_data_file, 'wb')
-pickle.dump(image_data, pfile)
-pfile.close()
+	pfile = open(image_data_file, 'wb')
+	pickle.dump(image_data, pfile)
+	pfile.close()
