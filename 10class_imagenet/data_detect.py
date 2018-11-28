@@ -49,21 +49,14 @@ mod_state_2 = torch.load(model_id_2, map_location = lambda storage, loc: storage
 model_2.load_state_dict(mod_state_2['model_state'])
 model_2.eval()
 
-if args.cuda:
-	model_1=model_1.cuda()
-	model_2=model_2.cuda()
-else:
-	model_1=model_1.cpu()
-	model_2=model_2.cpu()
-
 mean = np.array([0.485, 0.456, 0.406]).reshape((3, 1, 1))
 std = np.array([0.229, 0.224, 0.225]).reshape((3, 1, 1))
 
-fool_model_1 = PyTorchModel(model_1, bounds=(0,1), num_classes=10)
-attack_1 = SaliencyMapAttack(fool_model_1)
+fool_model_1 = PyTorchModel(model_1, bounds=(0,1), num_classes=10, preprocessing=(mean, std), device='cuda:0' if args.cuda else 'cpu')
+attack_1 = FGSM(fool_model_1)
 #attack_1 = LinfinityBasicIterativeAttack(fool_model_1, distance=foolbox.distances.Linfinity)
-fool_model_2 = PyTorchModel(model_2, bounds=(0,1), num_classes=10)
-attack_2 = SaliencyMapAttack(fool_model_2)
+fool_model_2 = PyTorchModel(model_2, bounds=(0,1), num_classes=10, preprocessing=(mean, std), device='cuda:0' if args.cuda else 'cpu')
+attack_2 = FGSM(fool_model_2)
 #attack_2 = LinfinityBasicIterativeAttack(fool_model_2, distance=foolbox.distances.Linfinity)
 #attack = FGSM(fool_model)
 #attack = IterativeGradientSignAttack(fool_model)
@@ -72,6 +65,8 @@ attack_2 = SaliencyMapAttack(fool_model_2)
 
 print(model_id_1[:-3])
 print(model_id_2[:-3])
+
+print(next(model_1.parameters()).is_cuda, next(model_2.parameters()).is_cuda)
 
 data = []
 
@@ -92,17 +87,29 @@ for i in range(args.data_size):
 		else:
 			attack_sample = attack_2(input_or_adv=clean_sample.cpu().numpy()[0], label=target[0,0])
 
-		if args.cuda:
-			clean_sample = clean_sample.cuda()
+		#try:
 
-		try:
-			pred_attack_1 = model_1.forward(torch.from_numpy(attack_sample).unsqueeze(0)).detach().cpu().numpy()
-			pred_attack_2 = model_2.forward(torch.from_numpy(attack_sample).unsqueeze(0)).detach().cpu().numpy()
-			sample = np.concatenate([pred_attack_1, pred_attack_2, np.ones([1,1])], 1)
-		except:
-			pred_clean_1 = model_1.forward(clean_sample).detach().cpu().numpy()
-			pred_clean_2 = model_2.forward(clean_sample).detach().cpu().numpy()
-			sample = np.concatenate([pred_clean_1, pred_clean_2, np.zeros([1,1])], 1)
+		print(attack_sample.max(), attack_sample.min())
+
+		attack_sample = torch.from_numpy((attack_sample-mean)/std).unsqueeze(0).float()
+
+		print(attack_sample.max(), attack_sample.min())
+
+		if args.cuda:
+			print('ioahdiuhiuh')
+			attack_sample = attack_sample.cuda()
+
+		pred_attack_1 = model_1.forward(attack_sample).detach().cpu().numpy()
+		pred_attack_2 = model_2.forward(attack_sample).detach().cpu().numpy()
+		sample = np.concatenate([pred_attack_1, pred_attack_2, np.ones([1,1])], 1)
+		#except:
+
+			#if args.cuda:
+				#clean_sample = clean_sample.cuda()
+
+			#pred_clean_1 = model_1.forward(clean_sample).detach().cpu().numpy()
+			#pred_clean_2 = model_2.forward(clean_sample).detach().cpu().numpy()
+			#sample = np.concatenate([pred_clean_1, pred_clean_2, np.zeros([1,1])], 1)
 	else:
 
 		if args.cuda:
@@ -116,6 +123,6 @@ for i in range(args.data_size):
 
 data = np.asarray(data)
 
-pfile = open('./detec_jsma.p', 'wb')
+pfile = open('./detec_fgsm.p', 'wb')
 pickle.dump(data.squeeze(), pfile)
 pfile.close()
