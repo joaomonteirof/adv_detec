@@ -11,8 +11,9 @@ from models import vgg, resnet
 import pickle
 import foolbox
 from foolbox.models import PyTorchModel
-from foolbox.attacks import FGSM, IterativeGradientSignAttack, DeepFoolAttack, SaliencyMapAttack, GaussianBlurAttack, SaltAndPepperNoiseAttack, AdditiveGaussianNoiseAttack, CarliniWagnerL2Attack, LinfinityBasicIterativeAttack
+from foolbox.attacks import FGSM, LinfinityBasicIterativeAttack, DeepFoolAttack, SaliencyMapAttack, GaussianBlurAttack, SaltAndPepperNoiseAttack, AdditiveGaussianNoiseAttack, CarliniWagnerL2Attack
 import sys
+import os
 
 # Training settings
 parser = argparse.ArgumentParser(description='Adversarial/clean Cifar10 samples')
@@ -21,8 +22,11 @@ parser.add_argument('--data-size', type=int, default=10000, metavar='N', help='N
 parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
 parser.add_argument('--seed', type=int, default=1, metavar='S', help='random seed (default: 1)')
 parser.add_argument('--model-path', type=str, default='./trained_models/', metavar='Path', help='Path for model load')
+parser.add_argument('--attack', choices=['fgsm', 'igsm', 'jsma', 'deepfool', 'cw', 'gaussianblur', 'gaussiannoise', 'saltandpepper'], default='fgsm')
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
+
+id2att = {'fgsm':FGSM, 'igsm':LinfinityBasicIterativeAttack, 'jsma':SaliencyMapAttack, 'deepfool':DeepFoolAttack, 'cw':CarliniWagnerL2Attack, 'gaussianblur':GaussianBlurAttack, 'gaussiannoise':AdditiveGaussianNoiseAttack, 's:AdditiveGaussianNoiseAttackaltandpepper':SaltAndPepperNoiseAttack}
 
 torch.manual_seed(args.seed)
 if args.cuda:
@@ -53,22 +57,17 @@ mean = np.array([0.485, 0.456, 0.406]).reshape((3, 1, 1))
 std = np.array([0.229, 0.224, 0.225]).reshape((3, 1, 1))
 
 fool_model_1 = PyTorchModel(model_1, bounds=(0,1), num_classes=10, preprocessing=(mean, std), device='cuda:0' if args.cuda else 'cpu')
-attack_1 = FGSM(fool_model_1)
-#attack_1 = LinfinityBasicIterativeAttack(fool_model_1, distance=foolbox.distances.Linfinity)
 fool_model_2 = PyTorchModel(model_2, bounds=(0,1), num_classes=10, preprocessing=(mean, std), device='cuda:0' if args.cuda else 'cpu')
-attack_2 = FGSM(fool_model_2)
-#attack_2 = LinfinityBasicIterativeAttack(fool_model_2, distance=foolbox.distances.Linfinity)
-#attack = FGSM(fool_model)
-#attack = IterativeGradientSignAttack(fool_model)
-#attack = DeepFoolAttack(fool_model)
-#attack = SaliencyMapAttack(fool_model)
 
-print(model_id_1[:-3])
-print(model_id_2[:-3])
-
-print(next(model_1.parameters()).is_cuda, next(model_2.parameters()).is_cuda)
+if args.attack == 'igsm':
+	attack_1 = id2att[args.attack](fool_model_1, distance=foolbox.distances.Linfinity)
+	attack_2 = id2att[args.attack](fool_model_2, distance=foolbox.distances.Linfinity)
+else:
+	attack_1 = id2att[args.attack](fool_model_1)
+	attack_2 = id2att[args.attack](fool_model_2)
 
 data = []
+images = []
 
 for i in range(args.data_size):
 
@@ -87,29 +86,26 @@ for i in range(args.data_size):
 		else:
 			attack_sample = attack_2(input_or_adv=clean_sample.cpu().numpy()[0], label=target[0,0])
 
-		#try:
+		try:
 
-		print(attack_sample.max(), attack_sample.min())
+			attack_sample = torch.from_numpy((attack_sample-mean)/std).unsqueeze(0).float()
 
-		attack_sample = torch.from_numpy((attack_sample-mean)/std).unsqueeze(0).float()
+			if args.cuda:
+				attack_sample = attack_sample.cuda()
 
-		print(attack_sample.max(), attack_sample.min())
+			pred_attack_1 = model_1.forward(attack_sample).detach().cpu().numpy()
+			pred_attack_2 = model_2.forward(attack_sample).detach().cpu().numpy()
+			sample = np.concatenate([pred_attack_1, pred_attack_2, np.ones([1,1])], 1)
+			image_sample = attack_sample.cpu().numpy()[0]
+		except:
 
-		if args.cuda:
-			print('ioahdiuhiuh')
-			attack_sample = attack_sample.cuda()
+			if args.cuda:
+				clean_sample = clean_sample.cuda()
 
-		pred_attack_1 = model_1.forward(attack_sample).detach().cpu().numpy()
-		pred_attack_2 = model_2.forward(attack_sample).detach().cpu().numpy()
-		sample = np.concatenate([pred_attack_1, pred_attack_2, np.ones([1,1])], 1)
-		#except:
-
-			#if args.cuda:
-				#clean_sample = clean_sample.cuda()
-
-			#pred_clean_1 = model_1.forward(clean_sample).detach().cpu().numpy()
-			#pred_clean_2 = model_2.forward(clean_sample).detach().cpu().numpy()
-			#sample = np.concatenate([pred_clean_1, pred_clean_2, np.zeros([1,1])], 1)
+			pred_clean_1 = model_1.forward(clean_sample).detach().cpu().numpy()
+			pred_clean_2 = model_2.forward(clean_sample).detach().cpu().numpy()
+			sample = np.concatenate([pred_clean_1, pred_clean_2, np.zeros([1,1])], 1)
+			image_sample = clean_sample.cpu().numpy()[0]
 	else:
 
 		if args.cuda:
@@ -118,11 +114,29 @@ for i in range(args.data_size):
 		pred_clean_1 = model_1.forward(clean_sample).detach().cpu().numpy()
 		pred_clean_2 = model_2.forward(clean_sample).detach().cpu().numpy()
 		sample = np.concatenate([pred_clean_1, pred_clean_2, np.zeros([1,1])], 1)
+		image_sample = clean_sample.cpu().numpy()[0]
 
 	data.append(sample)
+	images.append(image_sample)
 
 data = np.asarray(data)
+image_data = np.asarray(images)
 
-pfile = open('./detec_fgsm.p', 'wb')
+data_file = './detec_'+args.attack+'.p'
+image_data_file = './raw_imgnet_'+args.attack+'.p'
+
+if os.path.isfile(data_file):
+	os.remove(data_file)
+	print(data_file+' Removed')
+
+if os.path.isfile(image_data_file):
+	os.remove(image_data_file)
+	print(image_data_file+' Removed')
+
+pfile = open(data_file, 'wb')
+pickle.dump(data.squeeze(), pfile)
+pfile.close()
+
+pfile = open(image_data_file, 'wb')
 pickle.dump(data.squeeze(), pfile)
 pfile.close()
