@@ -28,7 +28,7 @@ args.cuda = not args.no_cuda and torch.cuda.is_available()
 
 print('generating attack: ' + args.attack)
 
-id2att = {'fgsm':FGSM, 'igsm':LinfinityBasicIterativeAttack, 'jsma':SaliencyMapAttack, 'deepfool':DeepFoolAttack, 'cw':CarliniWagnerL2Attack, 'gaussianblur':GaussianBlurAttack, 'gaussiannoise':AdditiveGaussianNoiseAttack, 's:AdditiveGaussianNoiseAttackaltandpepper':SaltAndPepperNoiseAttack}
+id2att = {'fgsm':FGSM, 'igsm':LinfinityBasicIterativeAttack, 'jsma':SaliencyMapAttack, 'deepfool':DeepFoolAttack, 'cw':CarliniWagnerL2Attack, 'gaussianblur':GaussianBlurAttack, 'gaussiannoise':AdditiveGaussianNoiseAttack, 'saltandpepper':SaltAndPepperNoiseAttack}
 
 torch.manual_seed(args.seed)
 if args.cuda:

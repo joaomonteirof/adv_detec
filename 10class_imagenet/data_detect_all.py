@@ -25,7 +25,7 @@ parser.add_argument('--model-path', type=str, default='./trained_models/', metav
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 
-id2att = {'fgsm':FGSM, 'igsm':LinfinityBasicIterativeAttack, 'jsma':SaliencyMapAttack, 'deepfool':DeepFoolAttack, 'cw':CarliniWagnerL2Attack, 'gaussianblur':GaussianBlurAttack, 'gaussiannoise':AdditiveGaussianNoiseAttack, 's:AdditiveGaussianNoiseAttackaltandpepper':SaltAndPepperNoiseAttack}
+id2att = {'fgsm':FGSM, 'igsm':LinfinityBasicIterativeAttack, 'jsma':SaliencyMapAttack, 'deepfool':DeepFoolAttack, 'cw':CarliniWagnerL2Attack, 'gaussianblur':GaussianBlurAttack, 'gaussiannoise':AdditiveGaussianNoiseAttack, 'saltandpepper':SaltAndPepperNoiseAttack}
 
 torch.manual_seed(args.seed)
 if args.cuda:
@@ -125,7 +125,7 @@ for att in id2att.keys():
 		images.append(image_sample)
 
 	data = np.asarray(data)
-	image_data = np.asarray(images)
+	#image_data = np.asarray(images)
 
 	data_file = './detec_'+args.attack+'.p'
 	image_data_file = './raw_imgnet_'+args.attack+'.p'
@@ -142,6 +142,6 @@ for att in id2att.keys():
 	pickle.dump(data.squeeze(), pfile)
 	pfile.close()
 
-	pfile = open(image_data_file, 'wb')
-	pickle.dump(image_data, pfile)
-	pfile.close()
+	#pfile = open(image_data_file, 'wb')
+	#pickle.dump(image_data, pfile)
+	#pfile.close()
